@@ -33,7 +33,7 @@ def create_video():
                     f.write(response.content)
                 local_image_paths.append(local_image_path)
             else:
-                return jsonify({"error": f"Failed to download image from {url}"}), 400
+                return jsonify({"error": f"Failed to download image from {url}. Status code: {response.status_code}"}), 400
 
         # Create video from downloaded images
         clips = [VideoFileClip(img).set_duration(2) for img in local_image_paths]
