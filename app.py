@@ -1,32 +1,46 @@
 from flask import Flask, request, jsonify
-from moviepy.editor import VideoFileClip, concatenate_videoclips
-import os
+from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip
 
 app = Flask(__name__)
 
-# Endpoint to upload images and audio to create a video
+# Define the home route
+@app.route('/')
+def home():
+    return "Welcome to your Flask App!"
+
+# Define an API route to create a video
 @app.route('/create-video', methods=['POST'])
 def create_video():
-    if 'audio' not in request.files or 'images' not in request.files:
-        return jsonify({"error": "Audio and images are required"}), 400
+    # Extract data from the POST request (images, audio, and subtitles)
+    data = request.json
+    image_paths = data.get('images')  # List of image paths
+    audio_path = data.get('audio')    # Path to audio file
+    subtitles = data.get('subtitles') # List of subtitles with timestamps
 
-    audio = request.files['audio']
-    images = request.files.getlist('images')
+    # Create video from images
+    clips = [VideoFileClip(image).set_duration(2) for image in image_paths]
+    video = concatenate_videoclips(clips, method="compose")
 
-    # Save audio and images locally
-    audio.save('uploaded_audio.mp3')
-    image_paths = []
-    for index, image in enumerate(images):
-        image_path = f'image_{index}.jpg'
-        image.save(image_path)
-        image_paths.append(image_path)
+    # Add subtitles if provided
+    if subtitles:
+        subtitle_clips = [
+            TextClip(txt=sub["text"], fontsize=24, color='white')
+            .set_position(('center', 'bottom'))
+            .set_start(sub['start'])
+            .set_duration(sub['duration'])
+            for sub in subtitles
+        ]
+        video = CompositeVideoClip([video, *subtitle_clips])
 
-    # Create a video (this is just an example, you can modify it)
-    clips = [VideoFileClip(image_path).set_duration(2) for image_path in image_paths]
-    final_video = concatenate_videoclips(clips)
-    final_video.write_videofile('output_video.mp4')
+    # Add audio to video if provided
+    if audio_path:
+        video = video.set_audio(audio_path)
 
-    return jsonify({"message": "Video created successfully!", "video_path": "output_video.mp4"})
+    # Save the final video
+    output_path = "final_video.mp4"
+    video.write_videofile(output_path, codec="libx264")
+
+    return jsonify({"message": "Video created successfully!", "output_path": output_path})
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True)
