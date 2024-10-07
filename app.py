@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip
+from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, AudioFileClip
 
 app = Flask(__name__)
 
@@ -14,33 +14,41 @@ def create_video():
     # Extract data from the POST request (images, audio, and subtitles)
     data = request.json
     image_paths = data.get('images')  # List of image paths
-    audio_path = data.get('audio')    # Path to audio file
-    subtitles = data.get('subtitles') # List of subtitles with timestamps
+    audio_path = data.get('audio')     # Path to audio file
+    subtitles = data.get('subtitles')  # List of subtitles with timestamps
 
-    # Create video from images
-    clips = [VideoFileClip(image).set_duration(2) for image in image_paths]
-    video = concatenate_videoclips(clips, method="compose")
+    if not image_paths or (audio_path is None and not subtitles):
+        return jsonify({"error": "Invalid input data. Please provide images and either audio or subtitles."}), 400
 
-    # Add subtitles if provided
-    if subtitles:
-        subtitle_clips = [
-            TextClip(txt=sub["text"], fontsize=24, color='white')
-            .set_position(('center', 'bottom'))
-            .set_start(sub['start'])
-            .set_duration(sub['duration'])
-            for sub in subtitles
-        ]
-        video = CompositeVideoClip([video, *subtitle_clips])
+    try:
+        # Create video from images
+        clips = [VideoFileClip(image).set_duration(2) for image in image_paths]
+        video = concatenate_videoclips(clips, method="compose")
 
-    # Add audio to video if provided
-    if audio_path:
-        video = video.set_audio(audio_path)
+        # Add subtitles if provided
+        if subtitles:
+            subtitle_clips = [
+                TextClip(txt=sub["text"], fontsize=24, color='white')
+                .set_position(('center', 'bottom'))
+                .set_start(sub['start'])
+                .set_duration(sub['duration'])
+                for sub in subtitles
+            ]
+            video = CompositeVideoClip([video, *subtitle_clips])
 
-    # Save the final video
-    output_path = "final_video.mp4"
-    video.write_videofile(output_path, codec="libx264")
+        # Add audio to video if provided
+        if audio_path:
+            audio = AudioFileClip(audio_path)
+            video = video.set_audio(audio)
 
-    return jsonify({"message": "Video created successfully!", "output_path": output_path})
+        # Save the final video
+        output_path = "final_video.mp4"
+        video.write_videofile(output_path, codec="libx264")
+
+        return jsonify({"message": "Video created successfully!", "output_path": output_path})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
