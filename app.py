@@ -1,7 +1,7 @@
 import os
 import requests
 from flask import Flask, request, jsonify
-from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, AudioFileClip
+from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip
 
 app = Flask(__name__)
 
@@ -13,12 +13,11 @@ def home():
 def create_video():
     data = request.json
     image_urls = data.get('images')  # List of image URLs
-    audio_url = data.get('audio')     # Audio file URL
     subtitles = data.get('subtitles')  # List of subtitles with timestamps
 
     # Validate input
-    if not image_urls or (audio_url is None and not subtitles):
-        return jsonify({"error": "Invalid input data. Please provide images and either audio or subtitles."}), 400
+    if not image_urls:
+        return jsonify({"error": "Invalid input data. Please provide images."}), 400
 
     try:
         # Create a directory to store downloaded files
@@ -36,17 +35,6 @@ def create_video():
             else:
                 return jsonify({"error": f"Failed to download image from {url}"}), 400
 
-        # Download audio from URL if provided
-        local_audio_path = None
-        if audio_url:
-            response = requests.get(audio_url)
-            if response.status_code == 200:
-                local_audio_path = os.path.join("downloads", os.path.basename(audio_url))
-                with open(local_audio_path, 'wb') as f:
-                    f.write(response.content)
-            else:
-                return jsonify({"error": f"Failed to download audio from {audio_url}"}), 400
-
         # Create video from downloaded images
         clips = [VideoFileClip(img).set_duration(2) for img in local_image_paths]
         video = concatenate_videoclips(clips, method="compose")
@@ -62,11 +50,6 @@ def create_video():
             ]
             video = CompositeVideoClip([video, *subtitle_clips])
 
-        # Add audio to video if provided
-        if local_audio_path:
-            audio = AudioFileClip(local_audio_path)
-            video = video.set_audio(audio)
-
         # Save the final video
         output_path = "final_video.mp4"
         video.write_videofile(output_path, codec="libx264")
@@ -74,8 +57,6 @@ def create_video():
         # Clean up downloaded files
         for img in local_image_paths:
             os.remove(img)
-        if local_audio_path:
-            os.remove(local_audio_path)
 
         return jsonify({"message": "Video created successfully!", "output_path": output_path})
 
