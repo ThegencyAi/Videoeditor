@@ -1,7 +1,11 @@
 from flask import Flask, request, jsonify
 from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, AudioFileClip
+import os
 
 app = Flask(__name__)
+
+# Define your API key (for demonstration; in a real application, use environment variables)
+API_KEY = 'bravo1122'  # Replace with your actual API key
 
 # Define the home route
 @app.route('/')
@@ -11,6 +15,11 @@ def home():
 # Define an API route to create a video
 @app.route('/create-video', methods=['POST'])
 def create_video():
+    # Check for API key in the request headers
+    api_key = request.headers.get('x-api-key')
+    if api_key != API_KEY:
+        return jsonify({"error": "Unauthorized: Invalid API Key"}), 401
+
     # Extract data from the POST request (images, audio, and subtitles)
     data = request.json
     image_paths = data.get('images')  # List of image paths
